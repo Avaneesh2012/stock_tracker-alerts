@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stock Tracker & Alerts</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-light">
+<div class="container my-4">
+    <h1 class="mb-4">📊 Stock Tracker & Alerts</h1>
+
+    <!-- Stock Search Form -->
+    <form method="POST" class="row g-3 mb-4">
+        <div class="col-md-8">
+            <input
+                type="text"
+                class="form-control"
+                name="query"
+                placeholder="Enter ticker symbols (comma separated), e.g. AAPL, TSLA"
+                value="{{ current_query }}"
+                required
+            />
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" name="range">
+                <option value="7d" {% if selected_period == '7d' %}selected{% endif %}>1 Week</option>
+                <option value="1mo" {% if selected_period == '1mo' %}selected{% endif %}>1 Month</option>
+                <option value="6mo" {% if selected_period == '6mo' %}selected{% endif %}>6 Months</option>
+                <option value="1y" {% if selected_period == '1y' %}selected{% endif %}>1 Year</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Track Stocks</button>
+        </div>
+    </form>
+
+    <!-- Stocks Data -->
+    {% if stocks %}
+    <div class="row row-cols-1 row-cols-md-{{ stocks|length }} g-4 mb-5">
+        {% for stock in stocks %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">{{ stock.name }} ({{ stock.symbol }})</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">
+                        Price: {{ stock.price }} {{ stock.currency }}
+                    </h6>
+                    <canvas id="chart-{{ stock.symbol }}"></canvas>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Active Alerts -->
+    {% if alerts %}
+    <h4>📋 Active Price Alerts</h4>
+    <table class="table table-sm table-bordered mb-5">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Condition</th>
+                <th>Target Price</th>
+                <th>Remove</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alert in alerts %}
+            <tr>
+                <td>{{ alert.symbol }}</td>
+                <td>{{ alert.type }}</td>
+                <td>${{ '%.2f' | format(alert.price) }}</td>
+                <td>
+                    <form method="POST" action="/delete_alert" style="margin:0;">
+                        <input type="hidden" name="symbol" value="{{ alert.symbol }}">
+                        <input type="hidden" name="type" value="{{ alert.type }}">
+                        <input type="hidden" name="price" value="{{ alert.price }}">
+                        <button class="btn btn-sm btn-danger">X</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Add Alert Form -->
+    <h4>Set a Price Alert</h4>
+    <form method="POST" action="/add_alert" class="row g-2 mb-4">
+        <div class="col-md-3">
+            <input
+                type="text"
+                class="form-control"
+                name="alert_symbol"
+                placeholder="Ticker (e.g. TSLA)"
+                required
+            />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" name="alert_type">
+                <option value="above">Goes Above</option>
+                <option value="below">Drops Below</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <input
+                type="number"
+                class="form-control"
+                name="alert_price"
+                placeholder="Target Price"
+                step="0.01"
+                required
+            />
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-warning w-100">Set Alert</button>
+        </div>
+    </form>
+</div>
+
+<!-- Chart.js scripts -->
+<script>
+{% for stock in stocks %}
+    var ctx{{ stock.symbol }} = document.getElementById('chart-{{ stock.symbol }}').getContext('2d');
+    new Chart(ctx{{ stock.symbol }}, {
+        type: 'line',
+        data: {
+            labels: {{ chart_data[stock.symbol].labels | tojson }},
+            datasets: [{
+                label: '{{ stock.symbol }} Close Price',
+                data: {{ chart_data[stock.symbol].prices | tojson }},
+                borderColor: 'rgba(75, 192, 192, 1)',
+                fill: false,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { display: true, title: { display: true, text: 'Date' } },
+                y: { display: true, title: { display: true, text: 'Price ({{ stock.currency }})' } }
+            }
+        }
+    });
+{% endfor %}
+</script>
+
+</body>
+</html>
